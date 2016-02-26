@@ -11,16 +11,16 @@ require 5.0;
 
 my $path;	# Path to binary directory
 
-#BEGIN 
-#{
-#	if ($FindBin::Bin =~ /(.*)/) 
-#	{
-#		$path  = $1;
-#	}
-#}
+BEGIN 
+{
+	if ($FindBin::Bin =~ /(.*)/) 
+	{
+		$path  = $1;
+	}
+}
 
-#use String::Util 'trim';
 use Getopt::Long;
+use Archive::Tar;
 
 ### USER customizable section
 $0 =~ /([^\/]+)$/; my $progname = $1;
@@ -58,71 +58,53 @@ if (!$quite){
 	License();
 }
 
-
 chdir("/home/antho/public_html/");
 # read from config file for top level directories
-#my @topdirectories =('A','H','M','T','X','N','I','R','J','W','E','L','P','C','S','K','F','D','O','U','Q','Y');
-my @topdirectories =('Y','R','U','W','D','J','S');
+# my @topdirectories =('Y','R','U','W','D','J','S');
+my @topdirectories =('Y');
 my $omni_total		= 0;
 my $pdf_total		= 0;
 my $parsCit_total	= 0;
-
-foreach my $dir (@topdirectories){
-	if(! -e "$writedir/$dir"){
-		print "creating dir \"$writedir/$dir\" ";
-		mkdir("$writedir/$dir");
-	}
-	my $pdf_count	= `ls -lR $dir/*/*[0-9][0-9][0-9][0-9]\.pdf| wc -l`;
-	my $omni_count	= `ls -lR $dir/*/*[0-9][0-9][0-9][0-9]*omni*| wc -l`;
-
-	$pdf_count	=~ s/\s(.*)\s/$1/;
-	$omni_count	=~ s/\s(.*)\s/$1/;
-
-	my $parsCit_count	= `ls -lR $writedir/$dir/*/*[0-9][0-9][0-9][0-9]*parscit*| wc -l`;
-	$parsCit_count	=~ s/\s(.*)\s/$1/;
-
-	$omni_total	+= $omni_count;
-	$pdf_total	+= $pdf_count;
-	$parsCit_total	+= $parsCit_count;
-
-	print "\n$dir \t #PDF: $pdf_count \t #Omni:$omni_count \t #parsCit:$parsCit_count";
 	
-	my $omni_list = `ls -R $dir/*/*omni*`;
-	my @omni_files = split ( /\s/, $omni_list);
-	foreach my $omni_file (@omni_files){
-		my $basename = (split(/\//,$omni_file))[2];
-		$basename =~ s/\-omni\.xml//;
-		my $parscit_output_file = $basename."-parscit.130908.xml";
-		
-		my $basedir = (split(/\//,$omni_file))[1];
-       		#print "\n $basedir \n";
-		
-		if(! -e "$writedir/$dir/$basedir"){
-			mkdir("$writedir/$dir/$basedir");
+foreach my $topdir (@topdirectories){
+	if(! -e "$topdir"){
+		next;
+	}
+	opendir(my $dirdh, "$topdir")
+		or warn "can't open $topdir \n $!";
+	my @year_dirs = read (my $yeardir);
+	closedir $dirdh;
+	
+	while my $dir (@year_dirs){
+		my $year_suffix;
+		if($dir =~ /^[A-Z]([0-9][0-9])$/ ){
+			$year_suffix = $1;
+		}
+		else{
+			next;
 		}
 		
-		if(! -f "$omni_file"){
-			print "\n Omni file: \"$omni_file\" not found";
-			exit(0);
-		}
+		my $tar 			= Archive::Tar->new;
 		
-		#Failure
-		if(! -f "$writedir/$dir/$basedir/$parscit_output_file"){
-			print "\n creating \"$writedir/$dir/$basedir/$parscit_output_file\"";
-			print "\n $omni_file \t $parscit_output_file";
-			#call parscit
-			print "\nCalling parscit";
-			my $parscit_cmd = "/home/wing.nus/tools/citationTools/parscit/bin/citeExtract.pl -m extract_all -i xml $omni_file $writedir/$dir/$basedir/$parscit_output_file";
-			my $parscit_exit_status = system($parscit_cmd);
-			if($parscit_exit_status ne 0){
-				print "\n$parscit_output_file Failed";
-			}
-			else{
-				print "\n $parscit_output_file Success";
-			}
-			
-		}
+		my $pdf_count		= `ls -lR $topdir/$dir/*[0-9][0-9][0-9][0-9]\.pdf| wc -l`;
+		my $omni_count		= `ls -lR $topdir/$dir/*[0-9][0-9][0-9][0-9]*omni*| wc -l`;
+
+		$pdf_count			=~ s/\s(.*)\s/$1/;
+		$omni_count			=~ s/\s(.*)\s/$1/;
+
+		my $parsCit_count	= `ls -lR $topdir/$dir/*[0-9][0-9][0-9][0-9]*parscit*| wc -l`;
+		$parsCit_count		=~ s/\s(.*)\s/$1/;
+
+		$omni_total			+= $omni_count;
+		$pdf_total			+= $pdf_count;
+		$parsCit_total		+= $parsCit_count;
+
+		print "\n$dir \t #PDF: $pdf_count \t #Omni:$omni_count \t #parsCit:$parsCit_count";
+		
+		my $omni_list 	= `ls -R $topdir/$dir/*omni*`;
+		my @omni_files	= split ( /\s/, $omni_list);
+		$tar->add_files(@omni_files);
+		$tar->write($dir.'.tgz', COMPRESS_GZIP);
 	}
 }
-
 print "\n$pdf_total\t$omni_total \t $parsCit_total";

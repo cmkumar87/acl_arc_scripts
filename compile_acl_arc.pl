@@ -11,13 +11,13 @@ require 5.0;
 
 my $path;	# Path to binary directory
 
-BEGIN 
-{
-	if ($FindBin::Bin =~ /(.*)/) 
-	{
-		$path  = $1;
-	}
-}
+# BEGIN 
+# {
+	# if ($FindBin::Bin =~ /(.*)/) 
+	# {
+		# $path  = $1;
+	# }
+# }
 
 use Getopt::Long;
 use Archive::Tar;
@@ -60,8 +60,10 @@ if (!$quite){
 
 chdir("/home/antho/public_html/");
 # read from config file for top level directories
-# my @topdirectories =('Y','R','U','W','D','J','S');
-my @topdirectories =('Y');
+
+## directories with proceedings from ACL events.
+my @topdirectories =('J','Q','P','E','N','S','A','K','W');
+
 my $omni_total		= 0;
 my $pdf_total		= 0;
 my $parsCit_total	= 0;
@@ -72,10 +74,11 @@ foreach my $topdir (@topdirectories){
 	}
 	opendir(my $dirdh, "$topdir")
 		or warn "can't open $topdir \n $!";
-	my @year_dirs = read (my $yeardir);
+	my @year_dirs = readdir($dirdh);
 	closedir $dirdh;
 	
-	while my $dir (@year_dirs){
+	foreach my $dir (@year_dirs){
+		if (!defined $dir){die;}
 		my $year_suffix;
 		if($dir =~ /^[A-Z]([0-9][0-9])$/ ){
 			$year_suffix = $1;
@@ -84,15 +87,13 @@ foreach my $topdir (@topdirectories){
 			next;
 		}
 		
-		my $tar 			= Archive::Tar->new;
-		
 		my $pdf_count		= `ls -lR $topdir/$dir/*[0-9][0-9][0-9][0-9]\.pdf| wc -l`;
 		my $omni_count		= `ls -lR $topdir/$dir/*[0-9][0-9][0-9][0-9]*omni*| wc -l`;
 
 		$pdf_count			=~ s/\s(.*)\s/$1/;
 		$omni_count			=~ s/\s(.*)\s/$1/;
 
-		my $parsCit_count	= `ls -lR $topdir/$dir/*[0-9][0-9][0-9][0-9]*parscit*| wc -l`;
+		my $parsCit_count	= `ls -lR $topdir/$dir/*[0-9][0-9][0-9][0-9]*parscit\.130908\.xml| wc -l`;
 		$parsCit_count		=~ s/\s(.*)\s/$1/;
 
 		$omni_total			+= $omni_count;
@@ -101,10 +102,23 @@ foreach my $topdir (@topdirectories){
 
 		print "\n$dir \t #PDF: $pdf_count \t #Omni:$omni_count \t #parsCit:$parsCit_count";
 		
-		my $omni_list 	= `ls -R $topdir/$dir/*omni*`;
-		my @omni_files	= split ( /\s/, $omni_list);
-		$tar->add_files(@omni_files);
-		$tar->write($dir.'.tgz', COMPRESS_GZIP);
+		#my $omni_list 		= `ls -R $topdir/$dir/*omni*`;
+		#my @omni_files		= split ( /\s/, $omni_list);
+		#my $omnitar		= Archive::Tar->new;
+		#$omnitar->add_files(@omni_files);
+		#$omnitar->write($dir.'.tgz', COMPRESS_GZIP);
+		
+		my $pdftar			= Archive::Tar->new;
+		my $pdf_list 		= `ls -R $topdir/$dir/*[0-9][0-9][0-9][0-9]\.pdf`;
+		my @pdf_files		= split ( /\s/, $pdf_list);
+		$pdftar->add_files(@pdf_files);
+		$pdftar->write($dir.'.tgz', COMPRESS_GZIP);
+		
+		#my $parsCittar		= Archive::Tar->new;
+		#my $parsCit_list 	= `ls -R $topdir/$dir/*[0-9][0-9][0-9][0-9]*parscit\.130908\.xml`;
+		#my @parsCit_files	= split ( /\s/, $parsCit_list);
+		#$parsCittar->add_files(@parsCit_files);
+		#$parsCittar->write($dir.'.tgz', COMPRESS_GZIP);
 	}
 }
 print "\n$pdf_total\t$omni_total \t $parsCit_total";
